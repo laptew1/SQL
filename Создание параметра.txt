@@ -1,0 +1,17 @@
+declare
+	@js nvarchar(max),
+	@rp nvarchar(max)
+
+set @js = (select * from 
+		(
+		  select '' [name], '' [ru_name], '#field' [type], json_query('{"value":"@value","hidden":"@hidden","label":"@label","required":[],"type":"text", "col":6}') [object_form]
+		  --union all
+		  --select '' [name], '' [ru_name], '#field' [type], json_query('{"value":"@value","hidden":"@hidden","label":"@label","required":[],"type":"text", "col":6}') [object_form]
+		) t
+		for json path, root('params'))
+
+exec [operblock].[dev].[ms_api] 'params.add', @js, @rp out 
+select @rp
+
+insert into [OPERBLOCK].[dbo].[object_map]
+	values (newid(), getdate(), 1, 'operday_revise', '', 'object/key')

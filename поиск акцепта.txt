@@ -1,0 +1,90 @@
+
+declare @pr_purpose nvarchar(max) = '50% стоимость электроэнергии (мощности) за Июнь 2002 г. Договор энергоснабжения 78028900927040 от 13.12.2007 согласно счета №31590522092875 от 14.06.2002 в т.ч. НДС 2071.50
+Комиссия за сервисное обслуживание по договору №СБ 02.08.2001 от 02.08.2001 за период с 01.05.2002 по 31.05.2002 по доп. соглашению №СБ 02.08.2001 от 02.08.2001. Без НДС. Кол-во терминалов: 6
+НДС. Комиссия за сервисное обслуживание по договору №30-ТИ-РБ-50012 от 29.06.2001 за период с 01.05.2002 по 31.05.2002 за 20 терминалов по доп. соглашению №1 от 01.07.2001.'
+
+
+	select [дата], iif( [номер с №] is null,[номер с цифр],[номер с №]) [номер], [акцепт] from
+		(
+		select
+		iif (patindex('%от ["0-9]% % 20[0-2]%', [reason]) != 0,
+								SUBSTRING([reason],	patindex('%от ["0-9]% % 20[0-2]%', [reason]), 8 + patindex('% %',	SUBSTRING ([reason], 8+patindex('%от ["0-9]% % 20[0-2]%', [reason]), len([reason]))) +4), --дата с текстом
+								iif (patindex('%от ["0-9]%', [reason])= 0, null,SUBSTRING ([reason], patindex('%от ["0-9]_%', [reason]), iif(patindex('%[0-9]%',SUBSTRING ([reason],11+patindex('%от ["0-9]_%', [reason]),1))=1, 13, 11)))) --дата цифрами
+			[дата],
+		
+		iif ( patindex('%[№N]%', [reason]) = 0,
+				null,
+				SUBSTRING ([reason], 
+							--patindex('%[N№]%', [reason]) + iif(SUBSTRING ([reason], patindex('%[N№]%', [reason]) +1,1)= ' ', 2,1), --от начала номера если знак номера не нужен!
+							patindex('%[N№]%', [reason]),  --поиск от символа номера
+							1 + iif(patindex( '% %', SUBSTRING ([reason], 2+patindex('%[N№]%', [reason]), len ([reason])	)) = 0, -- пробел не встретился значит после номера конец строки
+									len ([reason]),
+									patindex( '% %', SUBSTRING ([reason], 2+patindex('%[N№]%', [reason]), len ([reason]))	) -- до первого пробела после номера
+									)
+							-- - iif(SUBSTRING ([reason], patindex('%[N№]%', [reason]) +1,1)= ' ', 2,1) -- вычитание разницы от начала номера если знак номера не нужен!
+							- iif (right (SUBSTRING (yy.ass,  -- пока что вывод только первого номера до запятой
+													patindex('%[N№]%', yy.ass), 
+													1 + patindex('% %',		SUBSTRING (yy.ass,	2 + patindex('%[N№]%', yy.ass),	len([reason]))	)
+													), 
+											1) = ',',1,0)
+							)
+			) [номер с №],
+	
+
+		iif (patindex('%[0-9][0-9][0-9/]%', 
+					yy.ass)
+					=0, null,SUBSTRING (yy.ass, -- для вывода с начала номера если вдруг не в начале
+													--поиск первого пробела с лева от %[0-9][0-9][0-9/]%
+										iif (patindex('%[ №.]%',	SUBSTRING (reverse (left(yy.ass,patindex('%[0-9][0-9][0-9/]%', yy.ass))),0,	len(yy.ass)	))=0,0,2) --нивелирование отсчета реверса с обычной строкой
+											+ patindex('%[0-9][0-9][0-9/]%', yy.ass)
+											- iif(patindex('%[ №.]%',	SUBSTRING (reverse (left(yy.ass,patindex('%[0-9][0-9][0-9/]%', yy.ass))),0,	len(yy.ass)	)) =0, --значит пробела нет до самого начала строки
+													patindex('%[0-9][0-9][0-9/]%', yy.ass),
+													patindex('%[ №.]%',	SUBSTRING (reverse (left(yy.ass,patindex('%[0-9][0-9][0-9/]%', yy.ass))),0,	len(yy.ass)	))),
+										iif																										--если конец пробел или конец строки
+											(patindex('% %',																							--до пробела следущего
+													SUBSTRING (yy.ass,	patindex('%[0-9][0-9][0-9/]%', yy.ass),	len([reason])																																			
+													)) = 0, len([reason]), patindex('% %',														--до конца строки инач до пробела
+																					SUBSTRING (yy.ass,	patindex('%[0-9][0-9][0-9/]%', yy.ass),	len([reason])	)
+																					) 
+																		   - 3 - iif (right (SUBSTRING (yy.ass,  -- пока что вывод только первого номера до запятой
+																										patindex('%[0-9][0-9][0-9/]%', yy.ass), 
+																										patindex('% %', SUBSTRING (yy.ass,	1+ patindex('%[0-9][0-9][0-9/]%', yy.ass),	len([reason])) )
+																										), 
+																							1) = ',',1,0) --\пока что вывод только первого номера до запятой
+																				 +
+																				 iif(patindex('%[ №.]%',	SUBSTRING (reverse (left(yy.ass,patindex('%[0-9][0-9][0-9/]%', yy.ass))),0,	len(yy.ass)	)) =0, --прибавка смещения влево
+																					patindex('%[0-9][0-9][0-9/]%', yy.ass)+2,
+																					patindex('%[ №.]%',	SUBSTRING (reverse (left(yy.ass,patindex('%[0-9][0-9][0-9/]%', yy.ass))),0,	len(yy.ass)	)))														
+											)
+
+										)
+			)[номер с цифр],
+		[reason] [акцепт]
+		from 
+
+		(select [reason], (replace ([reason] 
+							,iif (patindex('%[оj][тn] ["0-9]% % 20[0-2]%', [reason]) != 0,
+								SUBSTRING([reason],	patindex('%[оj][тn] ["0-9]% % 20[0-2]%', [reason]), 8 + patindex('% %',	SUBSTRING ([reason], 8+patindex('%[оj][тn] ["0-9]% % 20[0-2]%', [reason]), len([reason]))) +4), --дата с текстом
+								iif (patindex('%[оj][тn] ["0-9]%', [reason])= 0, '',SUBSTRING ([reason], patindex('%[оj][тn] ["0-9]_%', [reason]), iif(patindex('%[0-9]%',SUBSTRING ([reason],11+patindex('%[оj][тn] ["0-9]_%', [reason]),1))=1, 13, 11)))) --дата цифрами
+							,' ')) ass -- текст договора без даты
+		FROM [OPERBLOCK].[dbo].[accepts]	) yy 
+		) ss
+--where @pr_purpose like '%'+SUBSTRING([дата],3, len([дата]))+'%' --195 совпадений 12 секунд (198 без начала "от ")
+--where @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'  --43 совпадения 14 секунд    --65 (больше номеров из одного символа) совпадений если искать без номера так же 14 секунд
+--where @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+' '+[дата]+'%'--12\14 совпадений 14 секунд
+--where @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'+[дата]+'%'--16\23 совпадения 14 секунд
+--where @pr_purpose like '%'+[дата]+' '+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'--0\0 совпадений 14 секунд
+--where @pr_purpose like '%'+[дата]+'%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'--13\19 совпадений 14 секунд
+--where @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'+[дата]+'%' 
+--	or @pr_purpose like '%'+[дата]+'%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'  --16 совпадений 28 секунд
+
+	--where @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+' '+[дата]+'%'
+	--or @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'+[дата]+'%'
+	--or @pr_purpose like '%'+[дата]+' '+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'
+	--or @pr_purpose like '%'+[дата]+'%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%'--16 совпадений 58 секунд
+
+where @pr_purpose like '%'+SUBSTRING([дата],3, len([дата]))+'%'
+	and @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%' --16 совпадений 16 секунд
+--where @pr_purpose like '%'+SUBSTRING([дата],3, len([дата]))+'%'
+--	or @pr_purpose like '%'+iif( [номер с №] is null,[номер с цифр],[номер с №])+'%' --225 совпадений 23 секунд
+go
